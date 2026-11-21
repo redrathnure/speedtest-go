@@ -209,13 +209,22 @@ build)
     CLEANUP_DIST="true"
     ;;
 -p | --platforms)
-    shift
-    if [ $# -eq 0 ]; then
+    value="$2"
+    if [ -z "$value" ]; then
         printf "Error: --platforms requires a value\n" >&2
         printf "Usage: build_pkgs [--platforms linux/amd64,linux/arm64]\n" >&2
         exit 1
     fi
-    TARGET_PLATFORMS=($(printf '%s\n' "$1" | tr ',' ' '))
+    TARGET_PLATFORMS=($(printf '%s\n' "$value" | tr ',' ' '))
+    ;;
+-p=* | --platforms=*)
+    value="${1#*=}"
+    if [ -z "$value" ]; then
+        printf "Error: --platforms requires a value\n" >&2
+        printf "Usage: build_pkgs [--platforms linux/amd64,linux/arm64]\n" >&2
+        exit 1
+    fi
+    TARGET_PLATFORMS=($(printf '%s\n' "$value" | tr ',' ' '))
     ;;
 esac
 
