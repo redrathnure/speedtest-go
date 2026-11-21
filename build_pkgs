@@ -180,6 +180,7 @@ print_help() {
 Usage: build_pkgs [command] [OPTIONS]
 
 Commands:
+  build     Build packages for all platforms. Will be used if no command specified
   help      Print this help message and exit
   version   Print the current package version and exit
 
@@ -193,6 +194,9 @@ EOF
 }
 
 case "$1" in
+build)
+    shift
+    ;;
 -v | --version | version)
     print_version
     exit 0
