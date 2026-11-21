@@ -65,12 +65,25 @@ build_bin() {
 
     mkdir -p "$out_dir"
 
-    docker buildx build \
-        --output "type=local,dest=$out_dir" \
-        --target "bin_builder" \
-        --build-arg TARGETOS="$target_os" \
-        --build-arg TARGETARCH="$target_arch" \
-        -f Dockerfile.build .
+    case "$BUILDER_TYPE" in
+        local)
+            go mod download
+            CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" \
+                go build -ldflags "-w -s" -trimpath -buildvcs=false -o "$out_dir/$( [ "$target_os" = "windows" ] && echo speedtest-go.exe || echo speedtest-go )" .
+            ;;
+        docker)
+            docker buildx build \
+                --output "type=local,dest=$out_dir" \
+                --target "bin_builder" \
+                --build-arg TARGETOS="$target_os" \
+                --build-arg TARGETARCH="$target_arch" \
+                -f Dockerfile.build .
+            ;;
+        *)
+            printf "Error: unknown builder type '%s' (expected: local, docker, auto)\n" "$BUILDER_TYPE" >&2
+            exit 1
+            ;;
+    esac
 }
 
 build_final_package() {
@@ -186,6 +199,7 @@ Commands:
 Options:
   -c, --clean     Remove the ./dist directory before cleanup
   -p, --platforms Build only the given platforms (e.g. linux/amd64,linux/arm64)
+  -t, --type      Builder type: local, docker or auto (default: auto)
   -v, --version   Print the current package version and exit
   -h, --help      Print this help message and exit
 
@@ -225,6 +239,24 @@ build)
     fi
     TARGET_PLATFORMS=($(printf '%s\n' "$value" | tr ',' ' '))
     ;;
+-t | --type)
+    value="$2"
+    if [ -z "$value" ]; then
+        printf "Error: --type requires a value\n" >&2
+        printf "Usage: build_pkgs [--type local|docker|auto]\n" >&2
+        exit 1
+    fi
+    BUILDER_TYPE="$value"
+    ;;
+-t=* | --type=*)
+    value="${1#*=}"
+    if [ -z "$value" ]; then
+        printf "Error: --type requires a value\n" >&2
+        printf "Usage: build_pkgs [--type local|docker|auto]\n" >&2
+        exit 1
+    fi
+    BUILDER_TYPE="$value"
+    ;;
 esac
 
 # Validate requested platforms against the known set
@@ -237,6 +269,33 @@ if [ -n "${TARGET_PLATFORMS+x}" ]; then
             exit 1
         fi
     done
+fi
+
+# Resolve the builder type: explicit value or auto-detection
+if [ -z "${BUILDER_TYPE:-}" ]; then
+    BUILDER_TYPE="auto"
+fi
+
+if [[ "$BUILDER_TYPE" != "local" && "$BUILDER_TYPE" != "docker" && "$BUILDER_TYPE" != "auto" ]]; then
+    printf "Error: unknown builder type '%s' (expected: local, docker, auto)\n" "$BUILDER_TYPE" >&2
+    printf "Usage: build_pkgs [--type local|docker|auto]\n" >&2
+    exit 1
+fi
+
+if [ "$BUILDER_TYPE" = "auto" ]; then
+    #Prefer local installation
+    if command -v go >/dev/null 2>&1; then
+        BUILDER_TYPE="local"
+        printf "Auto-detected builder: local\n"
+
+    elif docker buildx version >/dev/null 2>&1; then
+        BUILDER_TYPE="docker"
+        printf "Auto-detected builder: docker\n"
+    
+    else
+        printf "Error: no builder available (need 'docker' or 'go' installed)\n" >&2
+        exit 1
+    fi
 fi
 
 # Build only the requested platforms, or all by default
