@@ -1,5 +1,47 @@
 ![LibreSpeed Logo](https://github.com/librespeed/speedtest-go/blob/master/.logo/logo3.png?raw=true)
 
+# About this fork
+
+## Motivation
+
+the repo exist to fix some issue with an [upstream librespeed/speedtest-go](https://github.com/librespeed/speedtest-go/) repo (see description bellow). Some of these fixes most likely will be never contributed to upstream repo (e.g. release and some artifact changes)
+
+### Changes
+
+#### More Frequented Releases
+
+The upstream [librespeed/speedtest-go](https://github.com/librespeed/speedtest-go/releases) does not provide releases for fresh changes (e.g. great updates to the speed test and stability pages). This fork provides more up-to-date releases.
+
+Custom releases are based on upstream one with a `-p<Number>` suffix. E.g. `v1.1.6-p1` means the first custom release based on `v1.1.6` upstream one.
+
+Please note that a local build may give a dirty artifact version such as `v1.1.6-p1-10-g47b7d47`, which means this version was built from a feature branch after `v1.1.6-p1` which contains 10 changes and is pointed by the `g47b7d47` git hash.
+
+
+#### Docker Images
+
+No any major changes in docker images are expected. Docker (compose) container configuration and all related customizations are the same (see `Docker/Docker Compose` in original README).
+
+
+#### Structure of Assets/App Packages
+
+A [release packages](https://github.com/redrathnure/speedtest-go/releases) has similar naming schem however a bit different content:
+
+1. `assets` and `assets_full` archive (see bellow).
+2. settings and servers configuration has a `.example` suffix to avoid correlation with already existed configs
+3. Binary files names `speedtest-go` instead `speedtest`. Please pay attention if use SystemD examples.
+
+`assets` and `assets_full` archives would simplify local deployments and updates with non embedded assets (e.g. to customize `server-list.json` config). However by default [web assets](./web/assets/) folder contains examples and some scratchy experiments. Please use the `assets` archive with a minimal set of pages and related resources if you decide that scratchy experiments should not be a part of your deployment.
+
+
+
+#### Other Experiments
+
+The master branch and published releases should be stable enough for daily usage. However, please pay attention that this repository may be (and will be) used as a sandbox for experiments before contributing to the upstream repo.
+
+
+
+Original readme:
+
 # LibreSpeed
 
 No Flash, No Java, No WebSocket, No Bullshit.
