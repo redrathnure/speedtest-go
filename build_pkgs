@@ -16,9 +16,8 @@ ALL_PLATFORMS=(
 
 ASSETS_DEFAULT_EXCLUDES=(
     "example*"
-    #TODO: fix or kill it
-    #"index-modern.html*"
-    #TODO: consider to remove simple from minimal dist
+    #TODO: return when it's fixed
+    "index-modern.html*"
 )
 
 # Override target dist folder but do not remove existed releases
