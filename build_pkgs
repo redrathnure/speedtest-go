@@ -129,8 +129,8 @@ build_package() {
     build_bin "$target_os" "$target_arch" "$tmp_bin_dir"
 
     # Build assets
-    local tmp_assets_file="./build/asserts${archive_ext}"
-    local tmp_assets_full_file="./build/asserts_full${archive_ext}"
+    local tmp_assets_file="./build/assets${archive_ext}"
+    local tmp_assets_full_file="./build/assets_full${archive_ext}"
 
     build_assets "$tmp_assets_file" "$tmp_assets_full_file"
 
