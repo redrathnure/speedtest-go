@@ -142,8 +142,35 @@ cleanup() {
     rm -rf ./build/
 }
 
+print_version() {
+    echo "Package version: '$VERSION'"
+}
 
-#TODO: print version
+print_help() {
+    cat <<'EOF'
+Usage: build_pkgs [command] [OPTIONS]
+
+Commands:
+  help      Print this help message and exit
+  version   Print the current package version and exit
+
+Options:
+  -v, --version   Print the current package version and exit
+  -h, --help      Print this help message and exit
+
+EOF
+}
+
+case "$1" in
+-v | --version | version)
+    print_version
+    exit 0
+    ;;
+-h | --help | help)
+    print_help
+    exit 0
+    ;;
+esac
 
 #TODO: flag to build only one platform
 
