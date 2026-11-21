@@ -25,6 +25,9 @@ ASSETS_DEFAULT_EXCLUDES=(
 # This value may be changed via -c cli arg
 CLEANUP_DIST="false"
 
+
+DIST_DIR="./dist/$VERSION"
+
 build_assets() {
     local dst_assets_file="$1"
     local dst_assets_full_file="$2"
@@ -77,6 +80,8 @@ build_final_package() {
     local tmp_assets_full_file="$3"
     local tmp_assets_file="$4"
 
+    mkdir -p "$DIST_DIR"
+
     local abs_dst_file="$(cd "$(dirname "$dst_file")" && pwd)/$(basename "$dst_file")"
 
     # Create staging directory containing the binary and both asset archives
@@ -91,8 +96,8 @@ build_final_package() {
     cp "README.md" "$stage_dir"
     cp "LICENSE" "$stage_dir"
 
-    rm -f "$dst_file"
-    mkdir -p "$(dirname "$dst_file")"
+    rm -f "$abs_dst_file"
+    
 
     if [ "${tmp_bin_dir##*/}" = "zip" ]; then
         (cd "$stage_dir" && zip -rq "$abs_dst_file" .)
@@ -132,7 +137,7 @@ build_package() {
 
     #Build final distribution archine
     local package_name="speedtest-go-${target_os}_${target_arch}_$VERSION$archive_ext"
-    local dist_file="./dist/$VERSION/$package_name"
+    local dist_file="$DIST_DIR/$package_name"
 
     build_final_package "$dist_file" "$tmp_bin_dir" "$tmp_assets_full_file" "$tmp_assets_file"
 
