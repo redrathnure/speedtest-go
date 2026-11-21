@@ -21,6 +21,10 @@ ASSETS_DEFAULT_EXCLUDES=(
     #TODO: consider to remove simple from minimal dist
 )
 
+# Override target dist folder but do not remove existed releases
+# This value may be changed via -c cli arg
+CLEANUP_DIST="false"
+
 build_assets() {
     local dst_assets_file="$1"
     local dst_assets_full_file="$2"
@@ -140,6 +144,10 @@ build_package() {
 cleanup() {
     printf "Preparing build directory...\n"
     rm -rf ./build/
+    if [ "$CLEANUP_DIST" = "true" ]; then
+        printf "Removing ./dist directory...\n"
+        rm -rf ./dist
+    fi
 }
 
 print_version() {
@@ -155,6 +163,7 @@ Commands:
   version   Print the current package version and exit
 
 Options:
+  -c, --clean     Remove the ./dist directory
   -v, --version   Print the current package version and exit
   -h, --help      Print this help message and exit
 
@@ -170,11 +179,12 @@ case "$1" in
     print_help
     exit 0
     ;;
+-c | --clean)
+    CLEANUP_DIST="true"
+    ;;
 esac
 
 #TODO: flag to build only one platform
-
-#TODO: add flag to cleanup dist
 
 cleanup
 
