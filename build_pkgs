@@ -151,7 +151,7 @@ cleanup() {
 }
 
 print_version() {
-    echo "Package version: '$VERSION'"
+    printf "Package version: '$VERSION'\n"
 }
 
 print_help() {
@@ -186,11 +186,11 @@ case "$1" in
 -p | --platforms)
     shift
     if [ $# -eq 0 ]; then
-        echo "Error: --platforms requires a value" >&2
-        echo "Usage: build_pkgs [--platforms linux/amd64,linux/arm64]" >&2
+        printf "Error: --platforms requires a value\n" >&2
+        printf "Usage: build_pkgs [--platforms linux/amd64,linux/arm64]\n" >&2
         exit 1
     fi
-    TARGET_PLATFORMS=($(echo "$1" | tr ',' ' '))
+    TARGET_PLATFORMS=($(printf '%s\n' "$1" | tr ',' ' '))
     ;;
 esac
 
@@ -198,8 +198,8 @@ esac
 if [ -n "${TARGET_PLATFORMS+x}" ]; then
     for platform in "${TARGET_PLATFORMS[@]}"; do
         if [[ " ${ALL_PLATFORMS[*]} " != *" $platform "* ]]; then
-            echo "Error: unknown platform '$platform'" >&2
-            echo "Valid platforms:" >&2
+            printf "Error: unknown platform '%s'\n" "$platform" >&2
+            printf "Valid platforms:\n" >&2
             printf "  %s\n" "${ALL_PLATFORMS[@]}" >&2
             exit 1
         fi
@@ -212,7 +212,7 @@ PLATFORMS=("${TARGET_PLATFORMS[@]+"${TARGET_PLATFORMS[@]}"}")
 
 cleanup
 
-trap 'echo "Interrupted by user, stopping build cycle."; exit 130' INT TERM
+trap 'printf "Interrupted by user, stopping build cycle.\n"; exit 130' INT TERM
 for platform in "${PLATFORMS[@]}"; do
     build_package "$platform"
 done
