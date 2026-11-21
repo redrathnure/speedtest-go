@@ -1,0 +1,157 @@
+#!/bin/bash
+
+VERSION=$(git describe --tags)
+
+ALL_PLATFORMS=(
+    "linux/amd64"
+    "linux/arm64"
+    "linux/arm"
+    "linux/386"
+    "windows/386"
+    "windows/amd64"
+    "windows/arm64"
+    "darwin/amd64"
+    "darwin/arm64"
+)
+
+ASSETS_DEFAULT_EXCLUDES=(
+    "example*"
+    #TODO: fix or kill it
+    #"index-modern.html*"
+    #TODO: consider to remove simple from minimal dist
+)
+
+build_assets() {
+    local dst_assets_file="$1"
+    local dst_assets_full_file="$2"
+    local src_dir="$(cd "$(dirname web/assets)" && pwd)/assets"
+
+    archive() {
+        local dst_file="$1"
+        local full="$2"
+
+        local abs_dst="$(cd "$(dirname "$dst_file")" && pwd)/$(basename "$dst_file")"
+
+        if [ ! -e "$abs_dst" ]; then
+            local flags=()
+            if [ "$full" != "true" ]; then
+                for e in "${ASSETS_DEFAULT_EXCLUDES[@]}"; do
+                    flags+=("--exclude=$e")
+                done
+            fi
+
+            (cd "$src_dir" && if [ "${dst_file##*.}" = "zip" ]; then
+                zip -rq ${flags[@]} "$abs_dst" .
+            else
+                tar ${flags[@]} -czf "$abs_dst" .
+            fi)
+        fi
+    }
+
+    archive "$dst_assets_file" "false"
+    archive "$dst_assets_full_file" "true"
+}
+
+build_bin() {
+    local target_os="$1"
+    local target_arch="$2"
+    local out_dir="$3"
+
+    mkdir -p "$out_dir"
+
+    docker buildx build \
+        --output "type=local,dest=$out_dir" \
+        --target "bin_builder" \
+        --build-arg TARGETOS="$target_os" \
+        --build-arg TARGETARCH="$target_arch" \
+        -f Dockerfile.build .
+}
+
+build_final_package() {
+    local dst_file="$1"
+    local tmp_bin_dir="$2"
+    local tmp_assets_full_file="$3"
+    local tmp_assets_file="$4"
+
+    local abs_dst_file="$(cd "$(dirname "$dst_file")" && pwd)/$(basename "$dst_file")"
+
+    # Create staging directory containing the binary and both asset archives
+    local stage_dir="$(mktemp -d)"
+
+    cp -r "$tmp_bin_dir"/* "$stage_dir"
+    cp "$tmp_assets_full_file" "$stage_dir"
+    cp "$tmp_assets_file" "$stage_dir"
+    cp "$tmp_assets_file" "$stage_dir"
+    cp "server-list.json" "$stage_dir/server-list.example.json"
+    cp "settings.toml" "$stage_dir/settings.example.toml"
+    cp "README.md" "$stage_dir"
+    cp "LICENSE" "$stage_dir"
+
+    rm -f "$dst_file"
+    mkdir -p "$(dirname "$dst_file")"
+
+    if [ "${tmp_bin_dir##*/}" = "zip" ]; then
+        (cd "$stage_dir" && zip -rq "$abs_dst_file" .)
+    else
+        (cd "$stage_dir" && tar -czf "$abs_dst_file" .)
+    fi
+
+    rm -rf "$stage_dir"
+}
+
+build_package() {
+    local target_platform="$1"
+    local target_os="${target_platform%%/*}"
+    local target_arch="${target_platform##*/}"
+    #TODO: extract to function
+    local use_zip="false"
+    local archive_ext=".tar.gz"
+
+    case "$target_os" in
+    windows | darwin)
+        use_zip="true"
+        archive_ext=".zip"
+        ;;
+    esac
+
+    printf "Building '$target_platform' package...\n"
+
+    # Build bin app files
+    local tmp_bin_dir="./build/bin/$target_platform"
+    build_bin "$target_os" "$target_arch" "$tmp_bin_dir"
+
+    # Build assets
+    local tmp_assets_file="./build/asserts${archive_ext}"
+    local tmp_assets_full_file="./build/asserts_full${archive_ext}"
+
+    build_assets "$tmp_assets_file" "$tmp_assets_full_file"
+
+    #Build final distribution archine
+    local package_name="speedtest-go-${target_os}_${target_arch}_$VERSION$archive_ext"
+    local dist_file="./dist/$VERSION/$package_name"
+
+    build_final_package "$dist_file" "$tmp_bin_dir" "$tmp_assets_full_file" "$tmp_assets_file"
+
+    #TODO: checksums
+
+    printf "A '$target_os/$target_arch' package saved to '$dist_file' file \n"
+}
+
+cleanup() {
+    printf "Preparing build directory...\n"
+    rm -rf ./build/
+}
+
+
+#TODO: print version
+
+#TODO: flag to build only one platform
+
+#TODO: add flag to cleanup dist
+
+cleanup
+
+trap 'echo "Interrupted by user, stopping build cycle."; exit 130' INT TERM
+for platform in "${ALL_PLATFORMS[@]}"; do
+    build_package "$platform"
+done
