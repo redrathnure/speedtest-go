@@ -163,7 +163,8 @@ Commands:
   version   Print the current package version and exit
 
 Options:
-  -c, --clean     Remove the ./dist directory
+  -c, --clean     Remove the ./dist directory before cleanup
+  -p, --platforms Build only the given platforms (e.g. linux/amd64,linux/arm64)
   -v, --version   Print the current package version and exit
   -h, --help      Print this help message and exit
 
@@ -182,13 +183,36 @@ case "$1" in
 -c | --clean)
     CLEANUP_DIST="true"
     ;;
+-p | --platforms)
+    shift
+    if [ $# -eq 0 ]; then
+        echo "Error: --platforms requires a value" >&2
+        echo "Usage: build_pkgs [--platforms linux/amd64,linux/arm64]" >&2
+        exit 1
+    fi
+    TARGET_PLATFORMS=($(echo "$1" | tr ',' ' '))
+    ;;
 esac
 
-#TODO: flag to build only one platform
+# Validate requested platforms against the known set
+if [ -n "${TARGET_PLATFORMS+x}" ]; then
+    for platform in "${TARGET_PLATFORMS[@]}"; do
+        if [[ " ${ALL_PLATFORMS[*]} " != *" $platform "* ]]; then
+            echo "Error: unknown platform '$platform'" >&2
+            echo "Valid platforms:" >&2
+            printf "  %s\n" "${ALL_PLATFORMS[@]}" >&2
+            exit 1
+        fi
+    done
+fi
+
+# Build only the requested platforms, or all by default
+PLATFORMS=("${TARGET_PLATFORMS[@]+"${TARGET_PLATFORMS[@]}"}")
+[ ${#PLATFORMS[@]} -eq 0 ] && PLATFORMS=("${ALL_PLATFORMS[@]}")
 
 cleanup
 
 trap 'echo "Interrupted by user, stopping build cycle."; exit 130' INT TERM
-for platform in "${ALL_PLATFORMS[@]}"; do
+for platform in "${PLATFORMS[@]}"; do
     build_package "$platform"
 done
