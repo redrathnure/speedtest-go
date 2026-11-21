@@ -141,9 +141,25 @@ build_package() {
 
     build_final_package "$dist_file" "$tmp_bin_dir" "$tmp_assets_full_file" "$tmp_assets_file"
 
-    #TODO: checksums
-
     printf "A '$target_os/$target_arch' package saved to '$dist_file' file \n"
+}
+
+generate_checksums() {
+    local checksum_file="$DIST_DIR/CHECKSUM"
+
+    cd "$DIST_DIR"
+
+    if [ -f CHECKSUM ]; then
+        rm -f CHECKSUM
+    fi
+
+    find . -type f -not -name 'CHECKSUM' -printf '%P\n' | sort | while read -r filename; do
+        if [ -f "$filename" ]; then
+            printf '%s  %s\n' "$(sha256sum "$filename" | cut -d ' ' -f 1)" "$filename" >> "CHECKSUM"
+        fi
+    done
+
+    printf "Checksums written to '%s'\n" "$checksum_file"
 }
 
 cleanup() {
@@ -221,3 +237,5 @@ trap 'printf "Interrupted by user, stopping build cycle.\n"; exit 130' INT TERM
 for platform in "${PLATFORMS[@]}"; do
     build_package "$platform"
 done
+
+generate_checksums
