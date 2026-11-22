@@ -28,6 +28,9 @@ DIST_DIR="./dist/$VERSION"
 
 BUILDER_TYPE="auto"
 
+BUILD_BIN_PKG="true"
+BUILD_DEB_PKG="true"
+
 build_assets() {
     local dst_assets_file="$1"
     local dst_assets_full_file="$2"
@@ -245,6 +248,8 @@ Commands:
 
 Options:
   -c, --clean     Remove the ./dist directory before cleanup
+  -sd, --skip-deb Set BUILD_DEB_PKG=false to skip deb packages
+  -sb, --skip-bin Set BUILD_BIN_PKG=false to skip binary packages
   -p, --platforms Build only the given platforms (e.g. linux/amd64,linux/arm64)
   -t, --type      Builder type: local, docker or auto (default: auto)
   -v, --version   Print the current package version and exit
@@ -332,6 +337,12 @@ parse_args() {
         -c | --clean)
             CLEANUP_DIST="true"
             ;;
+        -sd | --skip-deb)
+            BUILD_DEB_PKG="false"
+            ;;
+        -sb | --skip-bin)
+            BUILD_BIN_PKG="false"
+            ;;
         -p=* | -p | --platforms=* | --platforms)
             if [[ "$arg" == *"="* ]]; then
                 value="${arg#*=}"
@@ -383,12 +394,16 @@ validate_builder_type
 cleanup
 
 trap 'printf "Interrupted by user, stopping build cycle.\n"; exit 130' INT TERM
-for platform in "${PLATFORMS[@]}"; do
-    build_package "$platform"
-done
+if [ "$BUILD_BIN_PKG" = "true" ]; then
+    for platform in "${PLATFORMS[@]}"; do
+        build_package "$platform"
+    done
+fi
 
-for platform in "${PLATFORMS[@]}"; do
-    build_package_deb "$platform"
-done
+if [ "$BUILD_DEB_PKG" = "true" ]; then
+    for platform in "${PLATFORMS[@]}"; do
+        build_package_deb "$platform"
+    done
+fi
 
 generate_checksums
