@@ -21,3 +21,50 @@ FROM scratch AS bin_builder
 #and is **not** used for preparing result dcoker images
 WORKDIR /
 COPY --from=build_base /build/speedtest* ./
+
+
+
+
+FROM debian:bookworm-slim AS deb_build_base
+# Debian package
+# Assemble the .deb package using dpkg-deb as a toolchain. 
+# A `./deb/build.sh` script is used for buidling package.
+# Caller should specify TARGETARCH and VERSION args, then run `deb_builder` stage: 
+#   docker build --target deb_builder \
+#       --build-arg TARGETARCH=amd64 \
+#       --build-arg TARGETARCH="$(git describe --tags)" \
+#       -f Dockerfile.build  .
+
+RUN apt-get update && apt-get install -y dpkg-dev git wget
+
+# Install fresh GoLang
+RUN wget https://go.dev/dl/go1.27.4.linux-amd64.tar.gz \
+   && tar -C /usr/local -xzf go1.27.4.linux-amd64.tar.gz
+
+ENV PATH=$PATH:/usr/local/go/bin
+
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY ./ ./
+
+ARG TARGETARCH
+ARG VERSION
+
+# Build
+# call ./deb/build.sh scritp with specific arch and destanation location
+ENV DEB_HOST_ARCH="$TARGETARCH"
+ENV DEST_DIR="/build/dist"
+
+RUN ./deb/build.sh
+
+
+FROM scratch AS deb_builder
+# A special target to copy result deb package only
+# It's used only for preparing distribuiton packages
+#and is **not** used for preparing result dcoker images
+WORKDIR /
+COPY --from=deb_build_base /build/dist/* ./

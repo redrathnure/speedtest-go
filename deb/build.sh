@@ -16,16 +16,21 @@ set -eu
 # umask; dpkg-deb --root-owner-group only rewrites ownership, not modes.
 umask 022
 
+
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-BUILD_DIR="$SCRIPT_DIR/build"
-STAGE_DIR="$BUILD_DIR/stage"
+BUILD_DIR="$ROOT_DIR/dist"
+STAGE_DIR="$ROOT_DIR/build/deb_stage"
+
+# set from outside to change place for rsult deb package(s)
+DEST_DIR="${DEST_DIR:-$ROOT_DIR/dist}"
 
 # ── Package metadata ────────────────────────────────────────────────────────
 if [ -z "${VERSION:-}" ] && git -C "$ROOT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-    VERSION=$(git -C "$ROOT_DIR" describe --tags --always | sed 's/^v//')
+    VERSION=$(git -C "$ROOT_DIR" describe --tags --always)
 fi
 VERSION=${VERSION:-0.0.0}
+VERSION=$(echo $VERSION | sed 's/^v//')
 # A Debian version must start with a digit, a bare commit hash may not.
 case "$VERSION" in
     [0-9]*) ;;
@@ -88,7 +93,9 @@ mkdir -p "$ASSETS_DST"
 for entry in "$ASSETS_SRC"/*; do
     [ -e "$entry" ] || continue
     case "${entry##*/}" in
+        #Keep in sync with build_pkgs::ASSETS_DEFAULT_EXCLUDES
         example-*.html) continue ;;
+        index-modern.html*) continue ;;
     esac
     cp -a "$entry" "$ASSETS_DST/"
 done
@@ -126,7 +133,10 @@ sed -e "s|@VERSION@|$(sed_escape "$VERSION")|g" \
 chmod 0644 "$STAGE_DIR/DEBIAN/control"
 
 # ── Build ───────────────────────────────────────────────────────────────────
-DEB_FILE="$BUILD_DIR/speedtest-go_${VERSION}_${ARCH}.deb"
+mkdir -p "$DEST_DIR"
+
+DEB_FILE="$DEST_DIR/speedtest-go_${VERSION}_${ARCH}.deb"
+
 rm -f "$DEB_FILE"
 dpkg-deb --build --root-owner-group "$STAGE_DIR" "$DEB_FILE"
 

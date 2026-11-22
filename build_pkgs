@@ -24,7 +24,6 @@ ASSETS_DEFAULT_EXCLUDES=(
 # This value may be changed via -c cli arg
 CLEANUP_DIST="false"
 
-
 DIST_DIR="./dist/$VERSION"
 
 build_assets() {
@@ -66,23 +65,23 @@ build_bin() {
     mkdir -p "$out_dir"
 
     case "$BUILDER_TYPE" in
-        local)
-            go mod download
-            CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" \
-                go build -ldflags "-w -s" -trimpath -buildvcs=false -o "$out_dir/$( [ "$target_os" = "windows" ] && echo speedtest-go.exe || echo speedtest-go )" .
-            ;;
-        docker)
-            docker buildx build \
-                --output "type=local,dest=$out_dir" \
-                --target "bin_builder" \
-                --build-arg TARGETOS="$target_os" \
-                --build-arg TARGETARCH="$target_arch" \
-                -f Dockerfile.build .
-            ;;
-        *)
-            printf "Error: unknown builder type '%s' (expected: local, docker, auto)\n" "$BUILDER_TYPE" >&2
-            exit 1
-            ;;
+    local)
+        go mod download
+        CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" \
+            go build -ldflags "-w -s" -trimpath -buildvcs=false -o "$out_dir/$([ "$target_os" = "windows" ] && echo speedtest-go.exe || echo speedtest-go)" .
+        ;;
+    docker)
+        docker buildx build \
+            --output "type=local,dest=$out_dir" \
+            --target "bin_builder" \
+            --build-arg TARGETOS="$target_os" \
+            --build-arg TARGETARCH="$target_arch" \
+            -f Dockerfile.build .
+        ;;
+    *)
+        printf "Error: unknown builder type '%s' (expected: local, docker, auto)\n" "$BUILDER_TYPE" >&2
+        exit 1
+        ;;
     esac
 }
 
@@ -109,7 +108,6 @@ build_final_package() {
     cp "LICENSE" "$stage_dir"
 
     rm -f "$abs_dst_file"
-    
 
     if [ "${tmp_bin_dir##*/}" = "zip" ]; then
         (cd "$stage_dir" && zip -rq "$abs_dst_file" .)
@@ -153,7 +151,54 @@ build_package() {
 
     build_final_package "$dist_file" "$tmp_bin_dir" "$tmp_assets_full_file" "$tmp_assets_file"
 
-    printf "A '$target_os/$target_arch' package saved to '$dist_file' file \n"
+    printf "A '$target_os/$target_arch' package was saved to '$dist_file' file \n"
+}
+
+build_deb() {
+    local target_arch="$1"
+    local out_dir="$DIST_DIR"
+
+    mkdir -p "$out_dir"
+
+    case "$BUILDER_TYPE" in
+    local)
+        go mod download
+        DEB_HOST_ARCH="$target_arch" \
+            DEST_DIR="$out_dir" \
+            VERSION="$VERSION" \
+            ./deb/build.sh
+        ;;
+    docker)
+        docker buildx build \
+            --output "type=local,dest=$out_dir" \
+            --target "deb_builder" \
+            --build-arg TARGETOS="$target_os" \
+            --build-arg TARGETARCH="$target_arch" \
+            --build-arg VERSION="$VERSION" \
+            -f Dockerfile.build .
+        ;;
+    *)
+        printf "Error: unknown builder type '%s' (expected: local, docker, auto)\n" "$BUILDER_TYPE" >&2
+        exit 1
+        ;;
+    esac
+}
+
+build_package_deb() {
+    local target_platform="$1"
+    local target_os="${target_platform%%/*}"
+    local target_arch="${target_platform##*/}"
+
+    if [ "${target_os}" != "linux" ]; then
+        # skip non linux targets
+        return 0
+    fi
+
+    printf "Building '$target_platform' deb package...\n"
+
+    build_deb "$target_arch"
+
+    printf "A '$target_os/$target_arch' deb package was saved to '$DIST_DIR' dir \n"
 }
 
 generate_checksums() {
@@ -167,7 +212,7 @@ generate_checksums() {
 
     find . -type f -not -name 'CHECKSUM' -printf '%P\n' | sort | while read -r filename; do
         if [ -f "$filename" ]; then
-            printf '%s  %s\n' "$(sha256sum "$filename" | cut -d ' ' -f 1)" "$filename" >> "CHECKSUM"
+            printf '%s  %s\n' "$(sha256sum "$filename" | cut -d ' ' -f 1)" "$filename" >>"CHECKSUM"
         fi
     done
 
@@ -291,7 +336,7 @@ if [ "$BUILDER_TYPE" = "auto" ]; then
     elif docker buildx version >/dev/null 2>&1; then
         BUILDER_TYPE="docker"
         printf "Auto-detected builder: docker\n"
-    
+
     else
         printf "Error: no builder available (need 'docker' or 'go' installed)\n" >&2
         exit 1
@@ -307,6 +352,10 @@ cleanup
 trap 'printf "Interrupted by user, stopping build cycle.\n"; exit 130' INT TERM
 for platform in "${PLATFORMS[@]}"; do
     build_package "$platform"
+done
+
+for platform in "${PLATFORMS[@]}"; do
+    build_package_deb "$platform"
 done
 
 generate_checksums
