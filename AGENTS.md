@@ -32,6 +32,11 @@ go test ./...
 # Format + static checks — run before committing
 gofmt -w <changed files>   # or: gofmt -l .   to list unformatted files
 go vet ./...
+
+# Debian package
+./deb/build.sh   # builds deb/build/speedtest-go_<version>_<arch>.deb
+sh -n deb/build.sh deb/DEBIAN/postinst deb/DEBIAN/prerm deb/DEBIAN/postrm
+systemd-analyze verify deb/speedtest-go.service
 ```
 
 Notes:
@@ -39,6 +44,9 @@ Notes:
 - `CGO_ENABLED=0` is assumed by the Dockerfile and `.goreleaser.yml`; keep the
   codebase free of CGO dependencies (the SQLite driver is pure Go:
   `modernc.org/sqlite`).
+- The Go image version (`golang:1.25-alpine` in the `Dockerfile` and
+  `Dockerfile.build`) must stay in sync with the `go` directive in `go.mod`
+  — bump both together whenever the toolchain requirement changes.
 - Releases are cut with GoReleaser v2 (`.goreleaser.yml`) from the `master`
   branch via the manual `release.yml` workflow. Docker images are built
   multi-arch by `docker-publish.yml`.
@@ -94,10 +102,18 @@ database/
 server-list.json        Multi-point-of-test server list (modern front end).
 settings.toml           Runtime configuration (documented inline).
 Dockerfile              Multi-stage build → scratch image, port 8989.
+Dockerfile.build       Multi-stage build (golang:1.25-alpine → scratch) used
+                        to produce a binary-only archive for distribution
+                        packages; `build_pkgs` invokes it with
+                        `--target bin_builder` (copies only the compiled
+                        `speedtest` binary, no assets or config).
 .goreleaser.yml         Cross-platform release builds.
 .github/workflows/      release.yml (manual), docker-publish.yml,
                         arm-registry.yml.
 rpm/ systemd/           Packaging artifacts.
+deb/                    Debian packaging: control, maintainer scripts, systemd
+                        unit, settings.toml, server-list.json, build.sh.
+deb/build/              Build output from `./deb/build.sh` — do not commit.
 build/                  Untracked local build artifacts — do not commit.
 ```
 
@@ -203,7 +219,13 @@ There are two generations of front-end code; **match the file you edit**.
   assets.
 - Do not break PHP-frontend compatibility (`.php` endpoint aliases, response
   formats) — it is an advertised feature.
-- Do not commit `build/`, `dist/`, `speedtest.db`, `idObfuscation_salt.bin`,
-  or binaries (see `.gitignore`).
+- Do not commit `build/`, `deb/build/`, `dist/`, `speedtest.db`,
+  `idObfuscation_salt.bin`, or binaries (see `.gitignore`).
 - Do not log or expose raw client IP/PII beyond what the existing
   `redact_ip_addresses` setting allows.
+- Keep the `deb/` packaging files in sync with the README "Package (Debian)"
+  section: the build script, the systemd unit and the maintainer scripts must
+  all describe the same install layout (`/etc/speedtest-go`,
+  `/usr/share/speedtest-go/assets`, `/var/lib/speedtest-go`), and the
+  `server-list.json` symlink in the assets dir must point at the
+  `/etc/speedtest-go/server-list.json` conffile.
