@@ -253,7 +253,6 @@ Options:
 EOF
 }
 
-
 # Resolve the requested platforms, then validate them against the known set.
 # Exits on the first unknown platform.
 validate_target_platforms() {
@@ -271,16 +270,14 @@ validate_target_platforms() {
         done
     fi
 
-
     # Build only the requested platforms, or all by default
     #PLATFORMS=("${TARGET_PLATFORMS[@]+"${TARGET_PLATFORMS[@]}"}")
     PLATFORMS=("${TARGET_PLATFORMS[@]}")
     [ ${#PLATFORMS[@]} -eq 0 ] && PLATFORMS=("${ALL_PLATFORMS[@]}")
 
-    printf "Build packages for:\n" 
+    printf "Build packages for:\n"
     printf "  %s\n" "${PLATFORMS[@]}"
 }
-
 
 # Resolve the builder type: explicit value or auto-detection.
 # Exits on the first unknown builder type.
@@ -311,62 +308,74 @@ validate_builder_type() {
     printf "Using '%s' builder\n" "$BUILDER_TYPE"
 }
 
+# Parse every argument. Options may be combined in any order (e.g.
+# -t=auto -p=linux/arm). A valueless option takes its value from the next
+# argument, unless that argument is itself an option (it starts with a dash).
 
+parse_args() {
+    local i=0
+    while [ $i -lt ${#ARGS[@]} ]; do
+        local arg="${ARGS[$i]}"
+        local took_next=0
 
-case "$1" in
-build)
-    shift
-    ;;
--v | --version | version)
-    print_version
-    exit 0
-    ;;
--h | --help | help)
-    print_help
-    exit 0
-    ;;
--c | --clean)
-    CLEANUP_DIST="true"
-    ;;
--p | --platforms)
-    value="$2"
-    if [ -z "$value" ]; then
-        printf "Error: --platforms requires a value\n" >&2
-        printf "Usage: build_pkgs [--platforms linux/amd64,linux/arm64]\n" >&2
-        exit 1
-    fi
-    TARGET_PLATFORMS=($(printf '%s\n' "$value" | tr ',' ' '))
-    ;;
--p=* | --platforms=*)
-    value="${1#*=}"
-    if [ -z "$value" ]; then
-        printf "Error: --platforms requires a value\n" >&2
-        printf "Usage: build_pkgs [--platforms linux/amd64,linux/arm64]\n" >&2
-        exit 1
-    fi
-    TARGET_PLATFORMS=($(printf '%s\n' "$value" | tr ',' ' '))
-    ;;
--t | --type)
-    value="$2"
-    if [ -z "$value" ]; then
-        printf "Error: --type requires a value\n" >&2
-        printf "Usage: build_pkgs [--type local|docker|auto]\n" >&2
-        exit 1
-    fi
-    BUILDER_TYPE="$value"
-    ;;
--t=* | --type=*)
-    value="${1#*=}"
-    if [ -z "$value" ]; then
-        printf "Error: --type requires a value\n" >&2
-        printf "Usage: build_pkgs [--type local|docker|auto]\n" >&2
-        exit 1
-    fi
-    BUILDER_TYPE="$value"
-    ;;
-esac
+        case "$arg" in
+        build)
+            ;;
+        -v | --version | version)
+            print_version
+            exit 0
+            ;;
+        -h | --help | help)
+            print_help
+            exit 0
+            ;;
+        -c | --clean)
+            CLEANUP_DIST="true"
+            ;;
+        -p=* | -p | --platforms=* | --platforms)
+            if [[ "$arg" == *"="* ]]; then
+                value="${arg#*=}"
+            else
+                value="${ARGS[$((i + 1))]}"
+                took_next=1
+            fi
+            if [ -z "$value" ] || [[ "$value" == -* ]]; then
+                printf "Error: --platforms requires a value\n" >&2
+                print_help
+                exit 1
+            fi
+            TARGET_PLATFORMS=($(printf '%s\n' "$value" | tr ',' ' '))
+            ;;
+        -t=* | -t | --type=* | --type)
+            if [[ "$arg" == *"="* ]]; then
+                value="${arg#*=}"
+            else
+                value="${ARGS[$((i + 1))]}"
+                took_next=1
+            fi
+            if [ -z "$value" ] || [[ "$value" == -* ]]; then
+                printf "Error: --type requires a value\n" >&2
+                print_help
+                exit 1
+            fi
+            BUILDER_TYPE="$value"
+            ;;
+        *)
+            printf "Error: unknown option '%s'\n" "$arg" >&2
+            print_help
+            exit 1
+            ;;
+        esac
 
+        i=$((i + took_next + 1))
+    done
+}
 
+ARGS=()
+for a in "$@"; do
+    ARGS+=("$a")
+done
+parse_args
 
 validate_target_platforms
 validate_builder_type
