@@ -316,12 +316,9 @@ validate_builder_type() {
 # Parse every argument. Options may be combined in any order (e.g.
 # -t=auto -p=linux/arm). A valueless option takes its value from the next
 # argument, unless that argument is itself an option (it starts with a dash).
-
 parse_args() {
-    local i=0
-    while [ $i -lt ${#ARGS[@]} ]; do
-        local arg="${ARGS[$i]}"
-        local took_next=0
+    while [ $# -gt 0 ]; do
+        local arg="$1"
 
         case "$arg" in
         build)
@@ -347,8 +344,8 @@ parse_args() {
             if [[ "$arg" == *"="* ]]; then
                 value="${arg#*=}"
             else
-                value="${ARGS[$((i + 1))]}"
-                took_next=1
+                value="$2"
+                shift
             fi
             if [ -z "$value" ] || [[ "$value" == -* ]]; then
                 printf "Error: --platforms requires a value\n" >&2
@@ -361,8 +358,8 @@ parse_args() {
             if [[ "$arg" == *"="* ]]; then
                 value="${arg#*=}"
             else
-                value="${ARGS[$((i + 1))]}"
-                took_next=1
+                value="$2"
+                shift
             fi
             if [ -z "$value" ] || [[ "$value" == -* ]]; then
                 printf "Error: --type requires a value\n" >&2
@@ -378,15 +375,11 @@ parse_args() {
             ;;
         esac
 
-        i=$((i + took_next + 1))
+        shift
     done
 }
 
-ARGS=()
-for a in "$@"; do
-    ARGS+=("$a")
-done
-parse_args
+parse_args "$@"
 
 validate_target_platforms
 validate_builder_type
