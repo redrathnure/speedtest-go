@@ -1,5 +1,5 @@
 # bind address, use empty string to bind to all interfaces
-bind_address=""
+bind_address="localhost"
 # backend listen port
 listen_port=8989
 # change the base URL
