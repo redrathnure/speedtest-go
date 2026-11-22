@@ -1,0 +1,17 @@
+#!/bin/sh
+# prerm for speedtest-go: stop the service before its files are removed.
+set -e
+
+UNIT=speedtest-go.service
+
+case "$1" in
+    remove|deconfigure)
+        # On "upgrade" the service is intentionally left running; postinst
+        # restarts it once the new files are in place.
+        if command -v deb-systemd-invoke >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+            deb-systemd-invoke stop "$UNIT" >/dev/null || true
+        fi
+        ;;
+esac
+
+exit 0

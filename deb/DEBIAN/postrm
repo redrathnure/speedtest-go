@@ -1,0 +1,26 @@
+#!/bin/sh
+# postrm for speedtest-go: forget the unit and, on purge, drop runtime state.
+set -e
+
+PKG=speedtest-go
+UNIT=speedtest-go.service
+
+case "$1" in
+    remove|purge)
+        if command -v deb-systemd-helper >/dev/null 2>&1; then
+            deb-systemd-helper disable "$UNIT" >/dev/null || true
+        fi
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+        ;;
+esac
+
+if [ "$1" = purge ]; then
+    # Conffiles under /etc are removed by dpkg itself. The service account is
+    # deliberately kept: deleting a system user on purge risks UID reuse for
+    # files the package does not know about, and a reinstall simply reuses it.
+    rm -rf "/var/lib/$PKG"
+fi
+
+exit 0

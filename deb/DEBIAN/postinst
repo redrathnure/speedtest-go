@@ -1,0 +1,57 @@
+#!/bin/sh
+# postinst for speedtest-go.
+#
+# Responsibilities (see README "Debian package"):
+#   3.1 register the unprivileged speedtest-go service account
+#   3.2 make the shipped systemd unit known, enable it and start it
+# Settings (/etc/speedtest-go) and assets (/usr/share/speedtest-go) are
+# installed from the package payload, not from here.
+set -e
+
+PKG=speedtest-go
+UNIT=speedtest-go.service
+
+case "$1" in
+    configure)
+        # 3.1 - dedicated system user/group, no login shell, no home created
+        # (the state directory below is created explicitly instead).
+        if ! getent group "$PKG" >/dev/null; then
+            addgroup --system "$PKG"
+        fi
+        if ! getent passwd "$PKG" >/dev/null; then
+            adduser --system --ingroup "$PKG" --no-create-home \
+                --home "/var/lib/$PKG" --shell /usr/sbin/nologin \
+                --gecos "speedtest-go server" "$PKG"
+        fi
+
+        # Runtime state (bolt database, ID-obfuscation salt) lives here; the
+        # service runs with WorkingDirectory=/var/lib/speedtest-go, so make
+        # sure everything in there is owned by the service account - also
+        # files left behind by an older install or by a manual run as root.
+        install -d -o "$PKG" -g "$PKG" -m 0750 "/var/lib/$PKG"
+        chown -R "$PKG:$PKG" "/var/lib/$PKG" 2>/dev/null || true
+
+        # 3.2 - systemd: enable the unit (also works without a running
+        # systemd, deb-systemd-helper only records state + symlink) ...
+        if command -v deb-systemd-helper >/dev/null 2>&1; then
+            deb-systemd-helper enable "$UNIT" >/dev/null || true
+        fi
+
+        # ... and talk to the manager only when there is one (skip chroots
+        # and containers without systemd).
+        if [ -d /run/systemd/system ] && command -v deb-systemd-invoke >/dev/null 2>&1; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
+
+            if [ -z "${2:-}" ]; then
+                # first install: bring the service up
+                deb-systemd-invoke start "$UNIT" >/dev/null || true
+            elif systemctl is-active --quiet "$UNIT"; then
+                # upgrade: pick up the new binary, but do not resurrect a
+                # service the administrator had deliberately stopped
+                deb-systemd-invoke restart "$UNIT" >/dev/null || true
+            fi
+        fi
+        ;;
+esac
+
+exit 0

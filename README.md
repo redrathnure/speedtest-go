@@ -230,6 +230,45 @@ You need Go 1.21+ to compile the binary.
     # tls_key_file="privkey.pem"
     ```
 
+### Package (Debian)
+
+A Debian package is built with `deb/build.sh` and installed with `apt-get`.
+
+```sh
+$ cd speedtest-go
+$ ./deb/build.sh
+# deb/build/speedtest-go_1.1.6-p2_amd64.deb
+$ sudo apt-get install ./deb/build/speedtest-go_1.1.6-p2_amd64.deb
+```
+
+The binary is compiled with `CGO_ENABLED=0`, so the package builds on any
+Go 1.21+ platform without extra dependencies. `deb/build.sh` takes the version
+from `git describe` (a leading `v` is stripped) and the architecture from
+`dpkg --print-architecture`; both can be overridden with `VERSION` and
+`DEB_HOST_ARCH`.
+
+On install the package:
+
+1. creates the unprivileged `speedtest-go` system account (no login shell, no
+   home directory);
+2. installs the systemd unit to `/usr/lib/systemd/system` and enables it
+   (it is started on a first install, restarted on an upgrade if it was
+   already running);
+3. puts `settings.toml` and `server-list.json` in `/etc/speedtest-go`
+   (both are conffiles, so your edits survive upgrades);
+4. installs a minimal set of web assets to `/usr/share/speedtest-go/assets`
+   (the `example-*.html` demo pages are left out) and exposes
+   `/etc/speedtest-go/server-list.json` through a symlink, so the front end
+   always reads the same file as the one in `/etc`;
+5. creates the runtime state directory `/var/lib/speedtest-go` (bolt database,
+   ID-obfuscation salt) owned by the service account.
+
+Rebuild to pick up a new version:
+
+```sh
+$ ./deb/build.sh
+```
+
 ## Differences between Go and PHP implementation and caveats
 
 - Test IDs are generated as ULID (Universally Unique Lexicographically Sortable Identifier), unlike the PHP version's auto-increment integer IDs

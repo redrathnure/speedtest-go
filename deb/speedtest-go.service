@@ -1,0 +1,57 @@
+# Systemd unit for the speedtest-go Debian package.
+#
+# The service runs as the unprivileged speedtest-go account created by
+# DEBIAN/postinst. Runtime state (bolt database, ID-obfuscation salt) lives in
+# /var/lib/speedtest-go, which is created with the right ownership by
+# StateDirectory below as well as by postinst (the latter covers systems
+# without a running systemd, e.g. a chroot).
+
+[Unit]
+Description=LibreSpeed speed test server (speedtest-go)
+Documentation=https://github.com/librespeed/speedtest-go
+After=network.target
+
+[Service]
+Type=simple
+User=speedtest-go
+Group=speedtest-go
+
+ExecStart=/usr/bin/speedtest-go -c /etc/speedtest-go/settings.toml
+
+# The ID obfuscation salt (idObfuscation_salt.bin) is written to the current
+# working directory, so point it at the writable state directory.
+WorkingDirectory=/var/lib/speedtest-go
+StateDirectory=speedtest-go
+StateDirectoryMode=0750
+
+Restart=on-failure
+RestartSec=5
+UMask=0027
+
+# Hardening: the process only needs to read /etc and /usr/share and to write
+# its state directory. Note that RestrictAddressFamilies must keep AF_UNIX when
+# a database is reached over a local socket (MySQL default).
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProcSubset=pid
+LockPersonality=true
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+Package: speedtest-go
+Version: @VERSION@
+Section: net
+Priority: optional
+Architecture: @ARCH@
+Maintainer: @MAINTAINER@
+Installed-Size: @SIZE@
+Depends: adduser, init-system-helpers
+Homepage: https://github.com/librespeed/speedtest-go
+Description: Self-hosted speed test server (LibreSpeed Go backend)
+ speedtest-go serves a JavaScript front end for download/upload/ping/jitter
+ tests and can optionally record the results in a database (BoltDB, SQLite,
+ PostgreSQL, MySQL or MSSQL). It is a single static binary with no runtime
+ dependencies.
+ .
+ The package installs the server binary, a systemd unit, the configuration
+ files in /etc/speedtest-go and the web assets in /usr/share/speedtest-go.

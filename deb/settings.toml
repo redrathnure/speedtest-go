@@ -1,0 +1,68 @@
+# speedtest-go Debian package configuration.
+#
+# Installed at /etc/speedtest-go/settings.toml (a conffile: dpkg keeps your
+# edits across upgrades and prompts on conflict). Restart the service after
+# changing it:
+#
+#     systemctl restart speedtest-go
+
+# bind address, use empty string to bind to all interfaces
+bind_address=""
+# backend listen port
+listen_port=8989
+# change the base URL
+# url_base="/librespeed"
+# proxy protocol port, use 0 to disable
+proxyprotocol_port=0
+
+# Server location (latitude/longitude).
+# 0,0 means "look it up from ipinfo.io at startup", which needs outbound
+# internet access and adds a short delay. Set your own coordinates to skip
+# the lookup and to report an accurate distance to your users.
+server_lat=0
+server_lng=0
+# ipinfo.io API key, if applicable
+ipinfo_api_key=""
+
+# Web assets. The package ships a minimal set of pages (the example-*.html
+# demos are left out) here; delete this line to fall back to the assets
+# embedded in the binary.
+assets_path="/usr/share/speedtest-go/assets"
+
+# Password for the statistics page (/stats). The shipped value is the
+# upstream default and disables access - set your own to enable the page.
+statistics_password="PASSWORD"
+# redact IP addresses
+redact_ip_addresses=false
+# obfuscate test IDs in shared results (writes idObfuscation_salt.bin into
+# the state directory /var/lib/speedtest-go)
+# enable_id_obfuscation=true
+
+# Database for telemetry/statistics: none, memory, bolt, mysql, postgresql,
+# sqlite or mssql. "none" disables telemetry, statistics and result PNGs.
+# The package default is bolt: a single file, no external service needed.
+database_type="bolt"
+# For MySQL, include the driver network prefix and port in the hostname:
+# database_hostname="tcp(127.0.0.1:3306)"
+database_hostname=""
+database_name=""
+database_username=""
+database_password=""
+# database port (optional, defaults to driver default; only used by mssql)
+database_port=""
+
+# Location of the bolt/sqlite database file. /var/lib/speedtest-go is owned
+# by the speedtest-go service account and is the only writable path.
+database_file="/var/lib/speedtest-go/speedtest.db"
+
+# GeoIP offline database (.mmdb format) for ISP and country detection when
+# ipinfo.io is not available. Leave empty to disable.
+# geoip_database_file="/usr/share/speedtest-go/GeoIP-Country.mmdb"
+
+# TLS and HTTP/2 settings. TLS is required for HTTP/2. The certificate files
+# must be readable by the speedtest-go user; a reverse proxy in front of the
+# service is the usual setup instead.
+enable_tls=false
+enable_http2=false
+# tls_cert_file="/etc/speedtest-go/cert.pem"
+# tls_key_file="/etc/speedtest-go/privkey.pem"
