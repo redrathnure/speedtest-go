@@ -26,6 +26,8 @@ CLEANUP_DIST="false"
 
 DIST_DIR="./dist/$VERSION"
 
+BUILDER_TYPE="auto"
+
 build_assets() {
     local dst_assets_file="$1"
     local dst_assets_full_file="$2"
@@ -251,6 +253,66 @@ Options:
 EOF
 }
 
+
+# Resolve the requested platforms, then validate them against the known set.
+# Exits on the first unknown platform.
+validate_target_platforms() {
+    local platform
+
+    # Validate requested platforms against the known set
+    if [ -n "${TARGET_PLATFORMS+x}" ]; then
+        for platform in "${TARGET_PLATFORMS[@]}"; do
+            if [[ " ${ALL_PLATFORMS[*]} " != *" $platform "* ]]; then
+                printf "Error: unknown platform '%s'\n" "$platform" >&2
+                printf "Valid platforms:\n" >&2
+                printf "  %s\n" "${ALL_PLATFORMS[@]}" >&2
+                exit 1
+            fi
+        done
+    fi
+
+
+    # Build only the requested platforms, or all by default
+    #PLATFORMS=("${TARGET_PLATFORMS[@]+"${TARGET_PLATFORMS[@]}"}")
+    PLATFORMS=("${TARGET_PLATFORMS[@]}")
+    [ ${#PLATFORMS[@]} -eq 0 ] && PLATFORMS=("${ALL_PLATFORMS[@]}")
+
+    printf "Build packages for:\n" 
+    printf "  %s\n" "${PLATFORMS[@]}"
+}
+
+
+# Resolve the builder type: explicit value or auto-detection.
+# Exits on the first unknown builder type.
+validate_builder_type() {
+
+    if [[ "$BUILDER_TYPE" != "local" && "$BUILDER_TYPE" != "docker" && "$BUILDER_TYPE" != "auto" ]]; then
+        printf "Error: unknown builder type '%s' (expected: local, docker, auto)\n" "$BUILDER_TYPE" >&2
+        printf "Usage: build_pkgs [--type local|docker|auto]\n" >&2
+        exit 1
+    fi
+
+    if [ "$BUILDER_TYPE" = "auto" ]; then
+        #Prefer local installation
+        if command -v go >/dev/null 2>&1; then
+            BUILDER_TYPE="local"
+            printf "Auto-detected builder: local\n"
+
+        elif docker buildx version >/dev/null 2>&1; then
+            BUILDER_TYPE="docker"
+            printf "Auto-detected builder: docker\n"
+
+        else
+            printf "Error: no builder available (need 'docker' or 'go' installed)\n" >&2
+            exit 1
+        fi
+    fi
+
+    printf "Using '%s' builder\n" "$BUILDER_TYPE"
+}
+
+
+
 case "$1" in
 build)
     shift
@@ -304,48 +366,10 @@ build)
     ;;
 esac
 
-# Validate requested platforms against the known set
-if [ -n "${TARGET_PLATFORMS+x}" ]; then
-    for platform in "${TARGET_PLATFORMS[@]}"; do
-        if [[ " ${ALL_PLATFORMS[*]} " != *" $platform "* ]]; then
-            printf "Error: unknown platform '%s'\n" "$platform" >&2
-            printf "Valid platforms:\n" >&2
-            printf "  %s\n" "${ALL_PLATFORMS[@]}" >&2
-            exit 1
-        fi
-    done
-fi
 
-# Resolve the builder type: explicit value or auto-detection
-if [ -z "${BUILDER_TYPE:-}" ]; then
-    BUILDER_TYPE="auto"
-fi
 
-if [[ "$BUILDER_TYPE" != "local" && "$BUILDER_TYPE" != "docker" && "$BUILDER_TYPE" != "auto" ]]; then
-    printf "Error: unknown builder type '%s' (expected: local, docker, auto)\n" "$BUILDER_TYPE" >&2
-    printf "Usage: build_pkgs [--type local|docker|auto]\n" >&2
-    exit 1
-fi
-
-if [ "$BUILDER_TYPE" = "auto" ]; then
-    #Prefer local installation
-    if command -v go >/dev/null 2>&1; then
-        BUILDER_TYPE="local"
-        printf "Auto-detected builder: local\n"
-
-    elif docker buildx version >/dev/null 2>&1; then
-        BUILDER_TYPE="docker"
-        printf "Auto-detected builder: docker\n"
-
-    else
-        printf "Error: no builder available (need 'docker' or 'go' installed)\n" >&2
-        exit 1
-    fi
-fi
-
-# Build only the requested platforms, or all by default
-PLATFORMS=("${TARGET_PLATFORMS[@]+"${TARGET_PLATFORMS[@]}"}")
-[ ${#PLATFORMS[@]} -eq 0 ] && PLATFORMS=("${ALL_PLATFORMS[@]}")
+validate_target_platforms
+validate_builder_type
 
 cleanup
 
